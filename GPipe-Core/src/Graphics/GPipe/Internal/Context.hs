@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, RankNTypes, GeneralizedNewtypeDeriving, FlexibleContexts, FlexibleInstances, GADTs, DeriveDataTypeable #-}
+{-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, FlexibleContexts, FlexibleInstances, GADTs, DeriveDataTypeable #-}
 
 module Graphics.GPipe.Internal.Context
 (
@@ -32,6 +32,7 @@ where
 
 import Graphics.GPipe.Internal.Format
 import Control.Monad.Exception (MonadException, Exception, MonadAsyncException,bracket)
+import Control.Monad.Fix
 import Control.Monad.Trans.Reader
 import qualified Control.Monad.Fail as MF
 import Control.Monad.IO.Class
@@ -104,7 +105,7 @@ class ContextHandler ctx where
 --
 newtype ContextT ctx os m a =
     ContextT (ReaderT (ContextEnv ctx) (StateT (ContextState ctx) m) a)
-    deriving (Functor, Applicative, Monad, MonadIO, MonadException, MonadAsyncException)
+    deriving (Functor, Applicative, Monad, MonadIO, MonadException, MonadAsyncException, MonadFix)
 
 data ContextEnv ctx = ContextEnv {
     context :: ctx,
@@ -168,7 +169,7 @@ instance MonadIO m => MF.MonadFail (ContextT ctx os m) where
 
 -- | Run a 'ContextT' monad transformer that encapsulates an object space.
 --   You need an implementation of a 'ContextHandler', which is provided by an auxillary package, such as @GPipe-GLFW@.
-runContextT :: (MonadIO m, MonadAsyncException m, ContextHandler ctx) => ContextHandlerParameters ctx -> (forall os. ContextT ctx os m a) -> m a
+runContextT :: (MonadIO m, MonadAsyncException m, ContextHandler ctx) => ContextHandlerParameters ctx -> (ContextT ctx os m a) -> m a
 runContextT chp (ContextT m) = do
     cds <- liftIO newContextDatas
     bracket
